@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+comparison_env/
+
+# Environment
+.env
+
+# Generated outputs
+output/
+output_backup/
+comparison_output/
+ingestion_output/
+
+# Indexes
+index/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Optional
+*.npy

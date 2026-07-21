@@ -1,0 +1,50 @@
+# Enterprise Document Ingestion Pipeline - Requirements
+#
+# Pinned to the versions this project was built and tested against.
+# See README.md for setup instructions, including a note about installing
+# CPU-only vs GPU-enabled PyTorch (a dependency of Docling).
+
+# --- Module 1: PDF Loader ---
+pymupdf==1.28.0
+
+# --- Module 3: Layout Segmenter (layout, native text, table extraction,
+# plus the pdfplumber table-recovery fallback added after real-world
+# testing on large documents) ---
+docling==2.110.0
+pdfplumber==0.11.9
+
+# --- Module 4: OCR Extractor ---
+rapidocr==3.9.1
+opencv-python==4.13.0.92
+
+# --- Module 5: Vision Diagram Describer ---
+google-genai==2.10.0
+
+# --- Module 6: Cleaner ---
+ftfy==6.3.1
+
+# --- Module 8: Chunker ---
+langchain-text-splitters==1.1.2
+
+# --- RAG Stage 2: Embedding Generation (rag/embedding/embedder.py) ---
+sentence-transformers==5.6.0
+
+# --- RAG Stage 3: FAISS Vector Indexing (rag/indexing/faiss_index.py) ---
+faiss-cpu==1.14.3
+
+# --- RAG Stage 8: Streamlit chat UI (streamlit_app.py) ---
+streamlit==1.59.2
+
+# --- Shared / used across multiple modules ---
+numpy==2.4.4
+pillow==12.1.1
+pydantic==2.13.4
+
+# --- NOTE ON TORCH ---
+# Docling depends on PyTorch, which is NOT pinned here deliberately:
+# - If you have an NVIDIA GPU and want GPU acceleration, install PyTorch
+#   yourself FIRST, following the official instructions for your CUDA
+#   version at https://pytorch.org/get-started/locally/ , THEN run
+#   `pip install -r requirements.txt`.
+# - If you don't, `pip install docling` will pull in a working CPU-only
+#   build automatically - no action needed.
