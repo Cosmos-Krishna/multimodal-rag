@@ -11,17 +11,9 @@ comparison_env/
 # Environment
 .env
 
-# Generated outputs
-output/
+# Generated runtime data
+data/
 output_backup/
-comparison_output/
-ingestion_output/
-
-# Indexes
-index/
-
-# Logs
-logs/
 *.log
 
 # IDE
@@ -34,3 +26,4 @@ Thumbs.db
 
 # Optional
 *.npy
+freeze.txt

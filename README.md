@@ -46,35 +46,22 @@ Validation is the single point where extracted content — from native text, OCR
 
 ```
 .
-├── ingestion/
-│   ├── analysis/
-│   │   ├── page_preanalyzer.py      # page-level pre-analysis signals
-│   │   ├── layout_segmenter.py      # Docling-based region segmentation
-│   │   └── layout_analysis.py       # per-page structural measurements
-│   ├── extractors/
-│   │   ├── ocr_extractor.py         # RapidOCR fallback extraction
-│   │   └── vision_describer.py      # Gemini Vision figure/diagram description
-│   ├── processing/
-│   │   └── cleaner.py               # text cleaning and normalization
-│   ├── routing/
-│   │   └── routing_policy.py        # page-level routing decisions
-│   ├── pdf_loader.py                 # PDF loading and native text access
-│   ├── validator.py                  # region-level extraction validation
-│   ├── chunker.py                    # semantic chunking
-│   ├── output_writer.py              # chunks.json / metadata.json / reports
-│   └── orchestrator.py               # ingestion pipeline entry point
-├── rag/
-│   ├── embedding/
-│   │   └── embedder.py               # sentence-transformer embedding generation
-│   ├── indexing/
-│   │   └── faiss_index.py            # FAISS index construction and search
-│   └── retrieval/
-│       └── retriever.py              # query embedding + retrieval + reranking
-├── main.py                           # run full ingestion pipeline
-├── build_index.py                    # build FAISS index from embeddings
-├── ask.py                            # command-line question answering
-├── streamlit_app.py                  # Streamlit UI
-└── requirements.txt
+├── src/multimodal_rag/
+│   ├── ingestion/                     # layout-aware PDF ingestion
+│   ├── rag/                           # embeddings, indexing, retrieval, generation
+│   ├── cli/                           # canonical command-line implementations
+│   ├── ui/                            # Streamlit applications
+│   ├── evaluation/                    # evaluation runner
+│   └── tools/                         # comparison and diagnostics tools
+├── data/
+│   ├── input/                         # source PDFs
+│   ├── artifacts/                     # ingestion outputs, figures, and FAISS index
+│   ├── comparisons/                   # extraction comparison outputs
+│   ├── evaluation/                    # generated evaluation reports
+│   └── logs/                          # runtime logs
+├── main.py, build_index.py, ask.py   # thin compatibility wrappers
+├── streamlit_app.py                   # thin UI compatibility wrapper
+└── requirements.txt / pyproject.toml
 ```
 
 ## Tech Stack
@@ -107,6 +94,9 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Install the project package in editable mode
+python -m pip install --no-deps -e .
 ```
 
 Vision-based understanding and answer generation require a Gemini API key:
@@ -133,7 +123,47 @@ python ask.py "What are the long-term technology implications?"
 streamlit run streamlit_app.py
 ```
 
+The canonical implementations are also available as package modules:
+
+```bash
+python -m multimodal_rag.cli.ingest
+python -m multimodal_rag.cli.build_index
+python -m multimodal_rag.cli.ask "What are the long-term technology implications?"
+```
+
+The root scripts remain thin compatibility wrappers. Runtime files use the
+modular `data/` layout; legacy runtime directories are read as temporary
+fallbacks when the corresponding new directory is absent.
+
 `ask.py` prints the retrieved chunks (with page number and similarity score) followed by the generated answer, so retrieval quality can be inspected alongside the final response rather than only seeing the end result.
+
+### Evaluation
+
+The existing batch evaluator retains its resumable behavior: it loads the full
+ground-truth dataset, skips IDs already present in the active provider CSV,
+appends each completed result, and regenerates the provider report.
+
+```powershell
+.venv\Scripts\python.exe ragas_eval.py
+```
+
+For an isolated developer trace, select exactly one ground-truth item by ID,
+exact normalized question text, or interactively:
+
+```powershell
+.venv\Scripts\python.exe ragas_eval_question.py --id 8
+.venv\Scripts\python.exe ragas_eval_question.py --question "What is the difference between the short-term and long-term technology implications of AI in marketing?"
+.venv\Scripts\python.exe ragas_eval_question.py --interactive
+```
+
+The question-wise evaluator is print-only. It does not read batch completion
+state or write evaluation CSVs, reports, the ground-truth dataset, the FAISS
+index, or other runtime artifacts. Its output includes the complete text and
+available ingestion metadata for every retrieved chunk, raw FAISS similarity
+scores, model and retriever details, timing, evaluator token/cost telemetry,
+and all existing per-question RAGAS metrics. The active lexical reranker does
+not expose its combined rerank score, and the generation adapter does not
+expose generation token counts; these fields are reported as unavailable.
 
 ## Pipeline Workflow
 
