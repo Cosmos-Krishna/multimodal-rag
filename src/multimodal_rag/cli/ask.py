@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-ask.py - Ask a question against the ingested, indexed document corpus.
+Ask a question against the ingested, indexed document corpus.
 
 Usage:
-    python ask.py "What are the main risk factors?"
-    python ask.py "..." --top-k 8 --index-dir data/artifacts/index
+    python -m multimodal_rag.cli.ask "What are the main risk factors?"
+    python -m multimodal_rag.cli.ask "..." --top-k 8 --index-dir data/artifacts/index
 """
 
 from __future__ import annotations
@@ -39,11 +39,10 @@ def main() -> int:
     try:
         index, id_map = load_index(args.index_dir)
     except IndexNotFoundError as e:
-        print(f"Error: {e}\nRun build_index.py first.")
+        print(f"Error: {e}\nRun python -m multimodal_rag.cli.build_index first.")
         return 1
 
-    # chunks = retrieve(args.query, index, id_map, retriever_config=RetrieverConfig(top_k=args.top_k))
-    chunks = retrieve(args.query, index, id_map, retriever_config=RetrieverConfig(top_k=8))
+    chunks = retrieve(args.query, index, id_map, retriever_config=RetrieverConfig(top_k=args.top_k))
     if not chunks:
         print("No relevant content found for that query.")
         return 0

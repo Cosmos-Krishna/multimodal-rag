@@ -10,9 +10,9 @@ touching the main project's outputs.
 
 Usage:
     pip install "unstructured[pdf]"
-    python unstructured_extract.py path/to/document.pdf
-    python unstructured_extract.py path/to/document.pdf --strategy hi_res
-    python unstructured_extract.py path/to/document.pdf --output-dir data/comparisons/unstructured
+    python -m multimodal_rag.tools.comparison.unstructured_extract path/to/document.pdf
+    python -m multimodal_rag.tools.comparison.unstructured_extract path/to/document.pdf --strategy hi_res
+    python -m multimodal_rag.tools.comparison.unstructured_extract path/to/document.pdf --output-dir data/comparisons/unstructured
 
 Output (under data/comparisons/unstructured/<pdf_stem>/):
     - extracted_text.md      All elements concatenated in document order,

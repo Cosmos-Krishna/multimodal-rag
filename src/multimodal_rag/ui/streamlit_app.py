@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-streamlit_app.py - Chat UI for the RAG system.
+Maintained Streamlit chat UI for the RAG system.
 
 Run with:
-    streamlit run streamlit_app.py
+    python -m streamlit run src/multimodal_rag/ui/streamlit_app.py
 
-Backend usage is unchanged from ask.py: load_index -> retrieve -> build_prompt
+Backend usage matches the CLI ask path: load_index -> retrieve -> build_prompt
 -> generate_answer. This file only adds a UI layer and short-term
 conversation memory (last few turns, used ONLY when building the prompt -
 retrieval still runs on the latest user message alone, per
-rag/retrieval/retriever.py, which is untouched).
+rag/retrieval/retriever_2.py, which is untouched).
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ def _new_chat():
 
 def _answer_query(query: str) -> RAGTrace:
     """Retrieval (latest query only) -> prompt (with memory) -> generation.
-    Every backend call here is identical in shape to ask.py; the only
+    Every backend call here is identical in shape to the CLI ask path; the only
     addition is passing conversation_history into build_prompt."""
     index, id_map = _load_index()
     return run_rag_trace(
@@ -293,7 +293,10 @@ def _render_developer_trace(trace: RAGTrace) -> None:
                 st.caption(f"Page: {pages}")
                 st.caption(f"Section: {item.section_title or 'Unavailable'}")
                 st.caption("Raw FAISS similarity score: " f"{item.raw_faiss_score:.17g}")
-                st.caption("Combined rerank score: unavailable")
+                st.caption(
+                    "Combined rerank score: "
+                    f"{_display_telemetry(item.combined_rerank_score)}"
+                )
                 with st.expander("Advanced metadata", expanded=False):
                     _render_metadata_fields(item.metadata)
                     if item.metadata is None and item.metadata_note:
@@ -379,6 +382,10 @@ def _render_evaluation_result(trace: QuestionEvaluationTrace) -> None:
                 st.caption(f"Section: {item.section_title or 'Unavailable'}")
                 st.caption(f"Chunk ID: `{item.chunk_id}`")
                 st.caption(f"Raw FAISS score: {item.raw_faiss_score:.17g}")
+                st.caption(
+                    "Combined rerank score: "
+                    f"{_display_telemetry(item.combined_rerank_score)}"
+                )
                 with st.expander("Metadata", expanded=False):
                     _render_metadata_fields(item.metadata)
                     if item.metadata is None and item.metadata_note:
@@ -421,7 +428,7 @@ def _render_evaluation_workspace() -> None:
 
     st.markdown("**Canonical question**")
     st.info(str(selected["question"]))
-    metadata = selected.get("metadata") or {}
+    metadata = selected.get("metadata") or selected
     meta_columns = st.columns(2)
     meta_columns[0].caption(f"Question type: {metadata.get('question_type', 'Unavailable')}")
     meta_columns[1].caption(f"Difficulty: {metadata.get('difficulty', 'Unavailable')}")
@@ -530,7 +537,7 @@ def _render_sidebar(workspace: str = "Chat"):
             st.caption(f"{stats['pages']:,} indexed pages · top {TOP_K} chunks per question")
         except IndexNotFoundError:
             st.warning("No knowledge base is indexed yet.")
-            st.caption("Run `python build_index.py` after ingestion.")
+            st.caption("Run `python -m multimodal_rag.cli.build_index` after ingestion.")
 
         with st.expander("System details"):
             st.caption(f"Index: `{INDEX_DIR}`")
@@ -615,7 +622,7 @@ def main():
                     status.update(label="Answer ready", state="complete")
                 except IndexNotFoundError:
                     answer = (
-                        "No document index found. Run `python build_index.py` after "
+                        "No document index found. Run `python -m multimodal_rag.cli.build_index` after "
                         "ingesting your PDFs, then restart this app."
                     )
                     status.update(label="Knowledge base unavailable", state="error")

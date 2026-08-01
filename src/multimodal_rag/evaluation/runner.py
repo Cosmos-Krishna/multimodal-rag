@@ -1,5 +1,5 @@
 """
-ragas_eval.py
+Batch RAGAS evaluation runner
 =================================
 
 Offline RAGAS evaluation script for the Multimodal PDF RAG system.
@@ -79,7 +79,7 @@ import logging
 import os
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -139,7 +139,8 @@ GROQ_MODEL_NAME = os.getenv(
     "GROQ_MODEL",
     "openai/gpt-oss-20b"
 )
-GROQ_FAITHFULNESS_MAX_TOKENS = 2048
+GROQ_FAITHFULNESS_MAX_TOKENS = 4096
+GROQ_ANSWER_CORRECTNESS_MAX_TOKENS = 4096
 
 
 def resolve_evaluator_provider() -> str:
@@ -274,6 +275,7 @@ PROVIDER_PRICING = {
 from multimodal_rag.rag.generation.answer_generator import (
     GenerationConfig,
     generate_answer,
+    generate_answer_with_metadata,
 )
 
 from multimodal_rag.rag.generation.citation import resolve_citations
@@ -797,6 +799,7 @@ def run_ragas_evaluation(
             context_precision,
             context_recall,
             answer_correctness,
+            AnswerCorrectness,
         )
         from ragas.llms import LangchainLLMWrapper
         from ragas.run_config import RunConfig
@@ -875,6 +878,7 @@ def run_ragas_evaluation(
     # there is no way to keep strictness=3 against Groq: n>1 is a hard
     # 400 on every call, not something a retry/backoff can work around.
     active_faithfulness = faithfulness
+    active_answer_correctness = answer_correctness
     if EVALUATOR_PROVIDER == "groq":
         if not isinstance(ragas_llm, LangchainLLMWrapper):
             raise TypeError(
@@ -888,6 +892,12 @@ def run_ragas_evaluation(
         active_faithfulness = Faithfulness(
             llm=LangchainLLMWrapper(faithfulness_chat_model)
         )
+        answer_correctness_chat_model = ragas_llm.langchain_llm.model_copy(
+            update={"max_tokens": GROQ_ANSWER_CORRECTNESS_MAX_TOKENS}
+        )
+        active_answer_correctness = AnswerCorrectness(
+            llm=LangchainLLMWrapper(answer_correctness_chat_model)
+        )
 
         active_answer_relevancy = AnswerRelevancy(strictness=1)
     else:
@@ -898,7 +908,7 @@ def run_ragas_evaluation(
         active_answer_relevancy,
         context_precision,
         context_recall,
-        answer_correctness,
+        active_answer_correctness,
     ]
 
     # Generous retry/backoff budget for the evaluator LLM itself - this

@@ -10,8 +10,8 @@ touching the main project's outputs.
 
 Usage:
     pip install marker-pdf
-    python marker_extract.py path/to/document.pdf
-    python marker_extract.py path/to/document.pdf --output-dir data/comparisons/marker
+    python -m multimodal_rag.tools.comparison.marker_extract path/to/document.pdf
+    python -m multimodal_rag.tools.comparison.marker_extract path/to/document.pdf --output-dir data/comparisons/marker
 
 Output (under data/comparisons/marker/<pdf_stem>/):
     - <pdf_stem>.md          Full Markdown output (Marker's native format;

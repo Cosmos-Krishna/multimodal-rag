@@ -205,7 +205,7 @@ def evaluate_ground_truth_item(entry: dict[str, Any]) -> QuestionEvaluationTrace
             ambiguous_metadata=ambiguous_metadata,
             retrieve_fn=runner.retrieve,
             build_prompt_fn=runner.build_prompt,
-            generate_answer_fn=runner.generate_answer,
+            generate_answer_fn=runner.generate_answer_with_metadata,
             resolve_citations_fn=runner.resolve_citations,
         )
         trace.rag = rag_trace
@@ -284,7 +284,10 @@ def print_trace(trace: QuestionEvaluationTrace, stream: TextIO = sys.stdout) -> 
         line()
         line(f"[{item.rank}]")
         line(f"Raw FAISS similarity score: {format(item.raw_faiss_score, '.17g')}")
-        line("Combined rerank score: unavailable - active retriever does not expose it")
+        line(
+            "Combined rerank score: "
+            f"{_display_value(item.combined_rerank_score, precision=17)}"
+        )
         line(f"Chunk ID: {item.chunk_id}")
         line(f"Document: {item.document_name}")
         line(f"Document ID: {item.document_id}")
@@ -322,9 +325,12 @@ def print_trace(trace: QuestionEvaluationTrace, stream: TextIO = sys.stdout) -> 
 
     line()
     line("TOKEN USAGE")
-    line("Generation prompt tokens: unavailable - generation adapter returns text only")
-    line("Generation completion tokens: unavailable - generation adapter returns text only")
-    line("Generation total tokens: unavailable - generation adapter returns text only")
+    line(f"Generation prompt tokens: {_display_value(trace.rag.generation_prompt_tokens)}")
+    line(
+        "Generation completion tokens: "
+        f"{_display_value(trace.rag.generation_completion_tokens)}"
+    )
+    line(f"Generation total tokens: {_display_value(trace.rag.generation_total_tokens)}")
     line(f"Evaluator prompt tokens: {_display_value(trace.evaluator_prompt_tokens)}")
     line(f"Evaluator completion tokens: {_display_value(trace.evaluator_completion_tokens)}")
     line(f"Evaluator total tokens: {_display_value(trace.evaluator_total_tokens)}")

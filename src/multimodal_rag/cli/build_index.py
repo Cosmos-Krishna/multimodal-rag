@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-build_index.py - Runs Stage 2 (embedding) over every document in
+Runs Stage 2 (embedding) over every document in
 data/artifacts/ingestion/
 that doesn't have embeddings yet, then builds/rebuilds the Stage 3 FAISS
-index. Run this after main.py has ingested your PDFs, and again whenever
+index. Run this after the ingestion CLI has ingested your PDFs, and again whenever
 new documents are added.
 
 Usage:
-    python build_index.py
-    python build_index.py --output-dir data/artifacts/ingestion --index-dir data/artifacts/index
+    python -m multimodal_rag.cli.build_index
+    python -m multimodal_rag.cli.build_index --output-dir data/artifacts/ingestion --index-dir data/artifacts/index
 """
 
 from __future__ import annotations
@@ -38,7 +38,10 @@ def main() -> int:
 
     output_dir = Path(args.output_dir)
     if not output_dir.is_dir():
-        print(f"Error: '{output_dir}' does not exist. Run main.py to ingest documents first.")
+        print(
+            f"Error: '{output_dir}' does not exist. Run "
+            "python -m multimodal_rag.cli.ingest first."
+        )
         return 1
 
     embedding_config = EmbeddingConfig()

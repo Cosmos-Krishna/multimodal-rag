@@ -8,7 +8,7 @@ heading-related object for ONE page - so we can see precisely which
 stage first loses a given heading string, instead of guessing.
 
 Usage:
-    python trace_page.py path/to/document.pdf --page 6 --search "Short-term implications"
+    python -m multimodal_rag.tools.diagnostics.trace_page path/to/document.pdf --page 6 --search "Short-term implications"
 """
 
 from __future__ import annotations

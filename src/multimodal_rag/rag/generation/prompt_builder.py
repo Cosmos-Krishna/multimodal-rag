@@ -12,7 +12,7 @@ MODIFIED: added optional `conversation_history` support so follow-up
 questions ("explain that", "summarize it") can be resolved by the LLM
 using recent chat context. This is purely a prompt-construction concern
 - retrieval still runs on the latest query alone (see rag/retrieval/
-retriever.py, unchanged) and answer generation is unaware memory exists
+retriever_2.py, unchanged) and answer generation is unaware memory exists
 (rag/generation/answer_generator.py, unchanged). `conversation_history`
 defaults to None, so every existing call site behaves exactly as before.
 """

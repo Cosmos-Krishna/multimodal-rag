@@ -61,6 +61,29 @@ class StreamlitEvaluationTests(unittest.TestCase):
         evaluate.assert_not_called()
         self.assertIsNone(ui.st.session_state.evaluation_result)
 
+    def test_top_level_ground_truth_metadata_is_displayed(self) -> None:
+        item = {
+            "id": 1,
+            "question": "What is Enterprise AI?",
+            "ground_truth": "Reference answer",
+            "question_type": "definition",
+            "difficulty": "easy",
+        }
+        meta_columns = [Mock(), Mock()]
+        with (
+            patch.object(ui, "load_ground_truth", return_value=[item]),
+            patch.object(ui.st, "selectbox", return_value="1"),
+            patch.object(
+                ui.st,
+                "columns",
+                side_effect=[meta_columns, _button_columns(False, False)],
+            ),
+        ):
+            ui._render_evaluation_workspace()
+
+        meta_columns[0].caption.assert_called_once_with("Question type: definition")
+        meta_columns[1].caption.assert_called_once_with("Difficulty: easy")
+
     def test_explicit_run_executes_once_and_stores_result(self) -> None:
         result = SimpleNamespace(status="success")
         with (

@@ -38,7 +38,7 @@ Design notes (consistent with layout_segmenter.py / page_preanalyzer.py):
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from multimodal_rag.ingestion.analysis.layout_segmenter import Region
 

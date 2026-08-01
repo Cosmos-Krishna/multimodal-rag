@@ -1,4 +1,4 @@
-"""Deterministic tests for the Groq-only Faithfulness token allowance."""
+"""Deterministic tests for Groq-only metric token allowances."""
 
 from __future__ import annotations
 
@@ -115,14 +115,15 @@ class FaithfulnessConfigurationTests(unittest.TestCase):
         evaluate.assert_called_once()
         return chat_model, shared_llm, captured
 
-    def test_groq_applies_2048_tokens_only_to_faithfulness(self) -> None:
+    def test_groq_applies_independent_metric_specific_token_limits(self) -> None:
         from ragas.llms import LangchainLLMWrapper
 
         chat_model, shared_llm, captured = self._run_with_provider("groq")
         metric_names = captured["metric_names"]
         metric_llms = captured["metric_llms"]
 
-        self.assertEqual(runner.GROQ_FAITHFULNESS_MAX_TOKENS, 2048)
+        self.assertEqual(runner.GROQ_FAITHFULNESS_MAX_TOKENS, 4096)
+        self.assertEqual(runner.GROQ_ANSWER_CORRECTNESS_MAX_TOKENS, 4096)
         self.assertEqual(
             metric_names,
             [
@@ -133,26 +134,37 @@ class FaithfulnessConfigurationTests(unittest.TestCase):
                 "answer_correctness",
             ],
         )
-        self.assertEqual(chat_model.model_copy_calls, [{"max_tokens": 2048}])
+        self.assertEqual(
+            chat_model.model_copy_calls,
+            [{"max_tokens": 4096}, {"max_tokens": 4096}],
+        )
 
         faithfulness_llm = metric_llms[0]
         self.assertIsInstance(faithfulness_llm, LangchainLLMWrapper)
         self.assertIsNot(faithfulness_llm, shared_llm)
         self.assertIsInstance(faithfulness_llm.langchain_llm, _CloneableChatModel)
-        self.assertEqual(faithfulness_llm.langchain_llm.max_tokens, 2048)
+        self.assertEqual(faithfulness_llm.langchain_llm.max_tokens, 4096)
         self.assertEqual(faithfulness_llm.langchain_llm.temperature, 0.0)
         self.assertFalse(hasattr(faithfulness_llm.langchain_llm, "kwargs"))
-        for metric_llm in metric_llms[1:]:
+        for metric_llm in metric_llms[1:4]:
             self.assertIs(metric_llm, shared_llm)
+        answer_correctness_llm = metric_llms[4]
+        self.assertIsInstance(answer_correctness_llm, LangchainLLMWrapper)
+        self.assertIsNot(answer_correctness_llm, shared_llm)
+        self.assertEqual(answer_correctness_llm.langchain_llm.max_tokens, 4096)
+        self.assertEqual(answer_correctness_llm.langchain_llm.temperature, 0.0)
         self.assertIsNone(shared_llm.langchain_llm.max_tokens)
 
-    def test_answer_correctness_keeps_shared_provider_default(self) -> None:
+    def test_remaining_groq_metrics_keep_shared_provider_default(self) -> None:
         chat_model, shared_llm, captured = self._run_with_provider("groq")
 
-        self.assertEqual(chat_model.model_copy_calls, [{"max_tokens": 2048}])
-        answer_correctness_llm = captured["metric_llms"][4]
-        self.assertIs(answer_correctness_llm, shared_llm)
-        self.assertIsNone(answer_correctness_llm.langchain_llm.max_tokens)
+        self.assertEqual(
+            chat_model.model_copy_calls,
+            [{"max_tokens": 4096}, {"max_tokens": 4096}],
+        )
+        for metric_llm in captured["metric_llms"][1:4]:
+            self.assertIs(metric_llm, shared_llm)
+            self.assertIsNone(metric_llm.langchain_llm.max_tokens)
 
     def test_ollama_keeps_one_unchanged_shared_wrapper_for_all_metrics(self) -> None:
         chat_model, shared_llm, captured = self._run_with_provider("ollama")

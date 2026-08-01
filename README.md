@@ -13,7 +13,7 @@ A retrieval-augmented question-answering system for PDF documents, built around 
 - **Local embeddings** — sentence-transformer embeddings computed locally, no external embedding API or per-query cost
 - **FAISS indexing** — vector similarity search over the embedded chunk corpus
 - **Retrieval-Augmented Generation** — retrieved chunks passed to Gemini as grounding context for answer generation
-- **Streamlit interface** — interactive UI for uploading documents, inspecting retrieval, and asking questions
+- **Streamlit interface** — interactive Chat and single-question Evaluation workspaces with source and retrieval diagnostics
 
 ## Architecture
 
@@ -59,8 +59,7 @@ Validation is the single point where extracted content — from native text, OCR
 │   ├── comparisons/                   # extraction comparison outputs
 │   ├── evaluation/                    # generated evaluation reports
 │   └── logs/                          # runtime logs
-├── main.py, build_index.py, ask.py   # thin compatibility wrappers
-├── streamlit_app.py                   # thin UI compatibility wrapper
+├── tests/                              # deterministic regression tests
 └── requirements.txt / pyproject.toml
 ```
 
@@ -72,10 +71,10 @@ Validation is the single point where extracted content — from native text, OCR
 | Document parsing / layout analysis | Docling | Structural region segmentation and reading order |
 | Page/region rendering | PyMuPDF | Rendering pages/regions to images for OCR and Vision |
 | OCR fallback | RapidOCR | Text recovery when native extraction is unreliable |
-| Vision understanding & answer generation | Gemini 2.5 Flash | Structural description of complex pages and grounded answer generation |
+| Vision understanding & answer generation | Gemini (`gemini-3.1-flash-lite` for answers) | Structural description of complex pages and grounded answer generation |
 | Embeddings | Sentence Transformers (`all-MiniLM-L6-v2`) | Local, cost-free dense chunk embeddings |
 | Vector index | FAISS | Similarity search over embedded chunks |
-| UI | Streamlit | Interactive document upload and Q&A |
+| UI | Streamlit | Interactive Chat, Evaluation, sources, and developer diagnostics |
 
 Every configurable stage (layout analysis thresholds, routing policy thresholds, validation rules, chunking parameters) is driven by a dedicated, typed config object rather than scattered constants, so behavior can be tuned per stage without touching extraction logic.
 
@@ -85,8 +84,8 @@ Requires Python 3.10 or later (the codebase uses modern type-hint syntax through
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/Cosmos-Krishna/multimodal-rag.git
+cd multimodal-rag
 
 # Create a virtual environment
 python -m venv .venv
@@ -111,31 +110,22 @@ Without a key, the pipeline still runs end-to-end using native extraction and OC
 
 ```bash
 # Run the full ingestion pipeline on a PDF
-python main.py path/to/document.pdf
+python -m multimodal_rag.cli.ingest path/to/document.pdf
 
 # Build the FAISS index from generated embeddings
-python build_index.py
+python -m multimodal_rag.cli.build_index
 
 # Ask a question from the command line
-python ask.py "What are the long-term technology implications?"
+python -m multimodal_rag.cli.ask "What are the long-term technology implications?"
 
 # Launch the interactive UI
-streamlit run streamlit_app.py
+python -m streamlit run src/multimodal_rag/ui/streamlit_app.py
 ```
 
-The canonical implementations are also available as package modules:
-
-```bash
-python -m multimodal_rag.cli.ingest
-python -m multimodal_rag.cli.build_index
-python -m multimodal_rag.cli.ask "What are the long-term technology implications?"
-```
-
-The root scripts remain thin compatibility wrappers. Runtime files use the
-modular `data/` layout; legacy runtime directories are read as temporary
+Runtime files use the modular `data/` layout; legacy runtime directories are read as temporary
 fallbacks when the corresponding new directory is absent.
 
-`ask.py` prints the retrieved chunks (with page number and similarity score) followed by the generated answer, so retrieval quality can be inspected alongside the final response rather than only seeing the end result.
+The CLI ask command prints the retrieved chunks (with page number and similarity score) followed by the generated answer, so retrieval quality can be inspected alongside the final response rather than only seeing the end result.
 
 ### Evaluation
 
@@ -144,26 +134,24 @@ ground-truth dataset, skips IDs already present in the active provider CSV,
 appends each completed result, and regenerates the provider report.
 
 ```powershell
-.venv\Scripts\python.exe ragas_eval.py
+.venv\Scripts\python.exe -m multimodal_rag.evaluation.runner
 ```
 
 For an isolated developer trace, select exactly one ground-truth item by ID,
 exact normalized question text, or interactively:
 
 ```powershell
-.venv\Scripts\python.exe ragas_eval_question.py --id 8
-.venv\Scripts\python.exe ragas_eval_question.py --question "What is the difference between the short-term and long-term technology implications of AI in marketing?"
-.venv\Scripts\python.exe ragas_eval_question.py --interactive
+.venv\Scripts\python.exe -m multimodal_rag.evaluation.question_runner --id 8
+.venv\Scripts\python.exe -m multimodal_rag.evaluation.question_runner --question "What is the difference between the short-term and long-term technology implications of AI in marketing?"
+.venv\Scripts\python.exe -m multimodal_rag.evaluation.question_runner --interactive
 ```
 
 The question-wise evaluator is print-only. It does not read batch completion
 state or write evaluation CSVs, reports, the ground-truth dataset, the FAISS
 index, or other runtime artifacts. Its output includes the complete text and
 available ingestion metadata for every retrieved chunk, raw FAISS similarity
-scores, model and retriever details, timing, evaluator token/cost telemetry,
-and all existing per-question RAGAS metrics. The active lexical reranker does
-not expose its combined rerank score, and the generation adapter does not
-expose generation token counts; these fields are reported as unavailable.
+and combined rerank scores, model and retriever details, timing, available
+Gemini/evaluator token telemetry, and all existing per-question RAGAS metrics.
 
 ## Pipeline Workflow
 

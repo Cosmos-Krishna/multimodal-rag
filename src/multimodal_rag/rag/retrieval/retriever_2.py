@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from multimodal_rag.rag.embedding.embedder import EmbeddingConfig, _embed_texts
 from multimodal_rag.rag.indexing.faiss_index import IndexedChunkRef, search
@@ -57,6 +57,7 @@ class RetrievedChunk:
     section_title: str | None
     chunk_text: str
     score: float
+    combined_rerank_score: float | None = field(default=None, compare=False)
 
 
 @dataclass
@@ -102,25 +103,28 @@ def retrieve(
     query_vector = embed_fn([query.strip()], embedding_config)[0]
     raw_results = search(index, id_map, query_vector, top_k=retriever_config.top_k)
 
-    if retriever_config.lexical_rerank_weight:
-        query_tokens = _tokenize(query)
-        raw_results = sorted(
-            raw_results,
-            key=lambda pair: (
-                pair[1]
-                + retriever_config.lexical_rerank_weight
-                * _lexical_overlap(query_tokens, pair[0].chunk_text)
-            ),
-            reverse=True,
+    query_tokens = _tokenize(query) if retriever_config.lexical_rerank_weight else set()
+    scored_results = [
+        (
+            ref,
+            score,
+            score
+            + retriever_config.lexical_rerank_weight
+            * _lexical_overlap(query_tokens, ref.chunk_text),
         )
+        for ref, score in raw_results
+    ]
+    if retriever_config.lexical_rerank_weight:
+        scored_results = sorted(scored_results, key=lambda result: result[2], reverse=True)
 
     results = [
         RetrievedChunk(
             chunk_id=ref.chunk_id, document_id=ref.document_id, source_file=ref.source_file,
             page_numbers=ref.page_numbers, section_title=ref.section_title,
             chunk_text=ref.chunk_text, score=score,
+            combined_rerank_score=combined_score,
         )
-        for ref, score in raw_results
+        for ref, score, combined_score in scored_results
         if score >= retriever_config.min_score
     ]
     logger.info("Retrieved %d chunk(s) for query (top_k=%d)", len(results), retriever_config.top_k)

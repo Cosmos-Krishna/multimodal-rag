@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-main.py - Entry point for the enterprise document ingestion pipeline.
+Package entry point for the enterprise document ingestion pipeline.
 
 Usage:
-    python main.py                          # process every PDF in data/input/
-    python main.py data/input/my_report.pdf  # process one specific PDF
-    python main.py --output-dir custom_out   # write elsewhere
-    python main.py --config-dir custom_cfg   # load calibrated configs from elsewhere
+    python -m multimodal_rag.cli.ingest                           # process every PDF
+    python -m multimodal_rag.cli.ingest data/input/my_report.pdf  # process one PDF
+    python -m multimodal_rag.cli.ingest --output-dir custom_out   # write elsewhere
+    python -m multimodal_rag.cli.ingest --config-dir custom_cfg   # use other config
 
 See README.md for full setup instructions.
 """
@@ -128,7 +128,7 @@ def main() -> int:
         targets = sorted(input_dir.glob("*.pdf"))
         if not targets:
             print(f"No PDFs found in '{input_dir}'. Place a PDF there, or pass a path directly:")
-            print(f"    python main.py path/to/your_file.pdf")
+            print("    python -m multimodal_rag.cli.ingest path/to/your_file.pdf")
             return 0
 
     logger.info("Found %d PDF(s) to process", len(targets))

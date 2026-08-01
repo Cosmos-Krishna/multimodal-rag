@@ -40,6 +40,14 @@ class GenerationConfig:
     # for the diagram-description prompt in vision_describer.py.
 
 
+@dataclass(frozen=True)
+class GenerationResult:
+    text: str
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+
+
 def _get_api_key() -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -49,7 +57,10 @@ def _get_api_key() -> str:
     return api_key
 
 
-def generate_answer(prompt_text: str, config: GenerationConfig | None = None) -> str:
+def generate_answer_with_metadata(
+    prompt_text: str,
+    config: GenerationConfig | None = None,
+) -> GenerationResult:
     config = config or GenerationConfig()
     api_key = _get_api_key()
 
@@ -66,8 +77,19 @@ def generate_answer(prompt_text: str, config: GenerationConfig | None = None) ->
         text = getattr(response, "text", None)
         if not text:
             raise AnswerGenerationError("Gemini returned a response with no text content.")
-        return text.strip()
+        usage = getattr(response, "usage_metadata", None)
+        return GenerationResult(
+            text=text.strip(),
+            prompt_tokens=getattr(usage, "prompt_token_count", None),
+            completion_tokens=getattr(usage, "candidates_token_count", None),
+            total_tokens=getattr(usage, "total_token_count", None),
+        )
     except AnswerGenerationError:
         raise
     except Exception as e:
         raise AnswerGenerationError(f"Gemini answer generation failed: {e}") from e
+
+
+def generate_answer(prompt_text: str, config: GenerationConfig | None = None) -> str:
+    """Compatibility wrapper preserving the original string-returning API."""
+    return generate_answer_with_metadata(prompt_text, config).text

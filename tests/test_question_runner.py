@@ -117,6 +117,7 @@ class EvaluationTraceTests(unittest.TestCase):
             section_title="Technology",
             chunk_text="FULL CHUNK TEXT\nSECOND LINE\nEND OF COMPLETE CHUNK",
             score=0.3361,
+            combined_rerank_score=0.4861,
         )
         citation = SimpleNamespace(
             marker="S1",
@@ -160,6 +161,7 @@ class EvaluationTraceTests(unittest.TestCase):
 
     def test_exactly_one_rag_and_ragas_execution_and_no_persistence(self) -> None:
         from multimodal_rag.evaluation import runner
+        from multimodal_rag.rag.generation.answer_generator import GenerationResult
 
         chunk, built, cited_answer, outcome, metadata = self._fake_trace_dependencies()
         entry = SAMPLE_ITEMS[0]
@@ -168,7 +170,16 @@ class EvaluationTraceTests(unittest.TestCase):
             patch.object(question_runner, "_load_chunk_metadata", return_value=(metadata, set())),
             patch.object(runner, "retrieve", return_value=[chunk]) as retrieve,
             patch.object(runner, "build_prompt", return_value=built) as build_prompt,
-            patch.object(runner, "generate_answer", return_value="Generated [S1]") as generate,
+            patch.object(
+                runner,
+                "generate_answer_with_metadata",
+                return_value=GenerationResult(
+                    text="Generated [S1]",
+                    prompt_tokens=10,
+                    completion_tokens=5,
+                    total_tokens=15,
+                ),
+            ) as generate,
             patch.object(runner, "resolve_citations", return_value=cited_answer),
             patch.object(runner, "run_ragas_evaluation", return_value=outcome) as ragas,
             patch.object(runner, "compute_composite_score", return_value=0.7),
@@ -193,6 +204,9 @@ class EvaluationTraceTests(unittest.TestCase):
         self.assertEqual(trace.rag.retrieved_items[0].chunk_text, chunk.chunk_text)
         self.assertEqual(trace.rag.retrieved_items[0].metadata["layout_type"], "table")
         self.assertEqual(trace.evaluator_total_tokens, 125)
+        self.assertEqual(trace.rag.generation_prompt_tokens, 10)
+        self.assertEqual(trace.rag.generation_completion_tokens, 5)
+        self.assertEqual(trace.rag.generation_total_tokens, 15)
         self.assertEqual(trace.composite_score, 0.7)
 
         evaluated_records = ragas.call_args.args[0]
@@ -202,7 +216,7 @@ class EvaluationTraceTests(unittest.TestCase):
             ["Page [7]: FULL CHUNK TEXT\nSECOND LINE\nEND OF COMPLETE CHUNK"],
         )
 
-    def test_renderer_prints_complete_text_raw_score_metadata_and_unavailable_score(self) -> None:
+    def test_renderer_prints_complete_text_scores_metadata_and_generation_usage(self) -> None:
         chunk, _built, _cited_answer, _outcome, metadata = self._fake_trace_dependencies()
         rag = question_runner.RAGTrace(
             original_question=SAMPLE_ITEMS[0]["question"],
@@ -218,9 +232,13 @@ class EvaluationTraceTests(unittest.TestCase):
                     section_title=chunk.section_title,
                     chunk_text=chunk.chunk_text,
                     metadata=metadata["chunk-1"],
+                    combined_rerank_score=chunk.combined_rerank_score,
                 )
             ],
             actual_retrieved_count=1,
+            generation_prompt_tokens=10,
+            generation_completion_tokens=5,
+            generation_total_tokens=15,
         )
         trace = question_runner.QuestionEvaluationTrace(
             ground_truth_id=1,
@@ -235,10 +253,12 @@ class EvaluationTraceTests(unittest.TestCase):
         rendered = output.getvalue()
 
         self.assertIn("Raw FAISS similarity score: 0.33610000000000001", rendered)
-        self.assertIn("Combined rerank score: unavailable", rendered)
+        self.assertIn("Combined rerank score: 0.48609999999999998", rendered)
         self.assertIn("FULL CHUNK TEXT\nSECOND LINE\nEND OF COMPLETE CHUNK", rendered)
         self.assertIn('"layout_type": "table"', rendered)
-        self.assertIn("Generation prompt tokens: unavailable", rendered)
+        self.assertIn("Generation prompt tokens: 10", rendered)
+        self.assertIn("Generation completion tokens: 5", rendered)
+        self.assertIn("Generation total tokens: 15", rendered)
 
 
 if __name__ == "__main__":

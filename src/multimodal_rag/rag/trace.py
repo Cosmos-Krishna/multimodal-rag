@@ -17,7 +17,11 @@ from multimodal_rag.paths import (
     LEGACY_INGESTION_ARTIFACTS_DIR,
 )
 from multimodal_rag.rag.embedding.embedder import EmbeddingConfig
-from multimodal_rag.rag.generation.answer_generator import GenerationConfig, generate_answer
+from multimodal_rag.rag.generation.answer_generator import (
+    GenerationConfig,
+    GenerationResult,
+    generate_answer_with_metadata,
+)
 from multimodal_rag.rag.generation.citation import resolve_citations
 from multimodal_rag.rag.generation.prompt_builder import ConversationTurn, build_prompt
 from multimodal_rag.rag.retrieval.retriever_2 import RetrieverConfig, retrieve
@@ -35,7 +39,7 @@ class RetrievedItemTrace:
     chunk_text: str
     metadata: dict[str, Any] | None = None
     metadata_note: str | None = None
-    combined_rerank_score: None = None
+    combined_rerank_score: float | None = None
 
 
 @dataclass
@@ -117,7 +121,7 @@ def run_rag_trace(
     ambiguous_metadata: set[str] | None = None,
     retrieve_fn: Callable[..., list[Any]] = retrieve,
     build_prompt_fn: Callable[..., Any] = build_prompt,
-    generate_answer_fn: Callable[..., str] = generate_answer,
+    generate_answer_fn: Callable[..., str | GenerationResult] = generate_answer_with_metadata,
     resolve_citations_fn: Callable[..., Any] = resolve_citations,
 ) -> RAGTrace:
     """Execute retrieval, prompt construction, generation, and citation resolution once."""
@@ -172,6 +176,7 @@ def run_rag_trace(
                 chunk_text=chunk.chunk_text,
                 metadata=metadata,
                 metadata_note=metadata_note,
+                combined_rerank_score=getattr(chunk, "combined_rerank_score", None),
             )
         )
 
@@ -183,8 +188,15 @@ def run_rag_trace(
             max_history_turns=max_history_turns,
         )
         generation_start = time.perf_counter()
-        raw_answer = generate_answer_fn(built.prompt_text, generation_config)
+        generation_result = generate_answer_fn(built.prompt_text, generation_config)
         trace.generation_latency_ms = (time.perf_counter() - generation_start) * 1000
+        if isinstance(generation_result, GenerationResult):
+            raw_answer = generation_result.text
+            trace.generation_prompt_tokens = generation_result.prompt_tokens
+            trace.generation_completion_tokens = generation_result.completion_tokens
+            trace.generation_total_tokens = generation_result.total_tokens
+        else:
+            raw_answer = generation_result
         cited_answer = resolve_citations_fn(raw_answer, built.source_map)
         trace.generated_answer = cited_answer.answer_text
         trace.citations = [_citation_dict(citation) for citation in cited_answer.citations]

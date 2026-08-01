@@ -32,7 +32,7 @@ sentence-transformers==5.6.0
 # --- RAG Stage 3: FAISS Vector Indexing (rag/indexing/faiss_index.py) ---
 faiss-cpu==1.14.3
 
-# --- RAG Stage 8: Streamlit chat UI (streamlit_app.py) ---
+# --- RAG Stage 8: Streamlit chat UI ---
 streamlit==1.59.2
 
 # --- Shared / used across multiple modules ---

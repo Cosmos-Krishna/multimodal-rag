@@ -32,7 +32,7 @@ class PackageSmokeTests(unittest.TestCase):
             PROJECT_ROOT / "evaluation" / "datasets" / "ground_truth.json",
         )
 
-    def test_canonical_modules_and_wrappers_exist(self) -> None:
+    def test_canonical_modules_exist_and_root_wrappers_are_absent(self) -> None:
         canonical_modules = (
             "multimodal_rag.cli.ingest",
             "multimodal_rag.cli.build_index",
@@ -41,6 +41,9 @@ class PackageSmokeTests(unittest.TestCase):
             "multimodal_rag.ui.streamlit_app",
             "multimodal_rag.evaluation.runner",
             "multimodal_rag.evaluation.question_runner",
+            "multimodal_rag.tools.comparison.marker_extract",
+            "multimodal_rag.tools.comparison.unstructured_extract",
+            "multimodal_rag.tools.diagnostics.trace_page",
         )
         for module_name in canonical_modules:
             with self.subTest(module=module_name):
@@ -60,7 +63,7 @@ class PackageSmokeTests(unittest.TestCase):
         )
         for wrapper in wrappers:
             with self.subTest(wrapper=wrapper):
-                self.assertTrue((PROJECT_ROOT / wrapper).is_file())
+                self.assertFalse((PROJECT_ROOT / wrapper).exists())
 
     def test_legacy_source_directories_are_absent(self) -> None:
         for directory in (
