@@ -9,8 +9,9 @@ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A traceable multimodal RAG system for complex PDFs. It combines
 layout-aware extraction, OCR and conditional vision understanding with
-local embeddings, FAISS retrieval, lexical reranking, Gemini answer
-generation, and built-in RAGAS evaluation.
+local embeddings, **hybrid dense + sparse retrieval (FAISS + BM25)**,
+**Reciprocal Rank Fusion (RRF)**, optional **Cross-Encoder reranking**,
+Gemini answer generation, and built-in retrieval and RAGAS evaluation.
 
 The application is split into a clean **User Workspace** for document
 Q&A and a **Developer Lab** for retrieval inspection, traces, latency,
@@ -19,7 +20,9 @@ token telemetry, and evaluation.
 ## What it does
 
 ``` text
-PDF → Extract → Chunk → Embed → Index → Retrieve → Rerank → Gemini → Answer
+PDF → Extract → Chunk → Embed → Index
+                              ↓
+Question → Dense FAISS + Sparse BM25 → RRF → Optional Cross-Encoder → Gemini → Answer
 ```
 
 The pipeline keeps document, page, section, extraction, and chunk
@@ -34,12 +37,18 @@ can also be inspected in the Developer Lab.
 -   Local `sentence-transformers/all-MiniLM-L6-v2` embeddings
 -   384-dimensional normalized vectors
 -   **FAISS** dense vector retrieval
--   Expanded candidate retrieval plus lexical reranking
+-   Dependency-free **BM25** sparse lexical retrieval
+-   **Reciprocal Rank Fusion (RRF)** across dense and sparse candidates
+-   Optional local **`BAAI/bge-reranker-base` Cross-Encoder** reranking
+-   Production default: **Hybrid FAISS + BM25 → RRF**
+-   Retrieval telemetry for FAISS, BM25, RRF, and Cross-Encoder scores
 -   **Gemini 3.1 Flash Lite** grounded answer generation
 -   Reusable RAG traces with chunks, scores, latency, and token
     telemetry
 -   Separate **User Workspace** and **Developer Lab**
--   Five-metric **RAGAS** evaluation
+-   Five-metric **RAGAS** answer/context evaluation
+-   Retrieval-only benchmarking with **Recall@k, Precision@k, MRR, nDCG@k, and latency**
+-   **25/25 verified** chunk-level retrieval relevance labels
 -   Question-wise and resumable batch evaluation
 
 # Architecture
@@ -52,10 +61,17 @@ flowchart TD
     B --> C["Structure-Aware Chunking<br/>Size: 1000 · Overlap: 150"]
     C --> D["MiniLM Embeddings<br/>all-MiniLM-L6-v2 · 384 dimensions"]
     D --> E["FAISS Vector Index<br/>Normalized vectors · IndexFlatIP"]
-    E --> F["Question → MiniLM Query Embedding"]
-    F --> G["Candidate Retrieval<br/>FAISS pool: 20"]
-    G --> H["Lexical Reranking<br/>FAISS score + 0.15 × lexical overlap"]
-    H --> I["Final Context<br/>Chat: Top 5 · CLI/Evaluation: Top 8"]
+
+    Q["User Question"] --> QE["MiniLM Query Embedding"]
+    QE --> F["Dense Retrieval<br/>FAISS"]
+    Q --> S["Sparse Retrieval<br/>BM25"]
+    F --> U["Candidate Union<br/>Deduplicate by chunk_id"]
+    S --> U
+    U --> R["Reciprocal Rank Fusion<br/>RRF · k=60"]
+    R --> CE{"Cross-Encoder enabled?"}
+    CE -->|"No · production default"| I["Final Context<br/>Chat: Top 5 · CLI/Evaluation: Top 8"]
+    CE -->|"Yes · optional"| X["BAAI/bge-reranker-base<br/>Query–Chunk Reranking"]
+    X --> I
     I --> J["Gemini 3.1 Flash Lite"]
     J --> K["Grounded Answer"]
 ```
@@ -79,8 +95,8 @@ flowchart LR
     C --> C2["Trace Inspector"]
     C --> C3["Evaluation Bench"]
 
-    C2 --> D["Chunks · FAISS Score · Rerank Score<br/>Tokens · Latency · Evidence"]
-    C3 --> E["RAGAS Metrics"]
+    C2 --> D["Chunks · FAISS · BM25 · RRF · Cross-Encoder<br/>Tokens · Latency · Evidence"]
+    C3 --> E["RAGAS Metrics<br/>+ Retrieval Benchmark"]
 ```
 
 **User Workspace** focuses on the answer and conversation. Technical
@@ -117,29 +133,83 @@ with **Groq `openai/gpt-oss-20b`** available as an optional provider.
 
 # How retrieval works
 
-The retriever uses semantic similarity and lightweight lexical matching
-together:
+Production retrieval uses a **hybrid dense + sparse pipeline** rather
+than relying on a single retrieval signal.
 
-1.  The question is embedded once with `all-MiniLM-L6-v2`.
-2.  FAISS searches an internal candidate pool of **20** chunks.
-3.  Query/chunk lexical tokens are normalized so punctuation and hyphen
-    variants such as `long-term` and `long term` are treated
-    consistently.
-4.  Candidates are reranked with:
-
-``` text
-combined_score = raw_faiss_score + 0.15 × lexical_overlap
+``` mermaid
+flowchart LR
+    Q["Question"] --> D["Dense Search<br/>MiniLM + FAISS"]
+    Q --> S["Sparse Search<br/>BM25"]
+    D --> U["Candidate Union"]
+    S --> U
+    U --> R["RRF Fusion"]
+    R --> C["Top Candidates"]
+    C -. "optional" .-> X["BGE Cross-Encoder"]
+    X -. "reranked candidates" .-> F["Final Context"]
+    C --> F
 ```
 
-5.  Only the caller-visible result count is returned:
-    -   **Chat:** top 5
-    -   **CLI:** top 8 by default
-    -   **Evaluation:** top 8
+1.  The question is embedded with `all-MiniLM-L6-v2`.
+2.  **FAISS** retrieves semantically similar dense candidates.
+3.  **BM25** independently retrieves sparse lexical candidates from the same indexed chunk corpus.
+4.  Dense and sparse results are combined by `chunk_id`.
+5.  **Reciprocal Rank Fusion (RRF)** combines the two ranked lists without directly mixing incompatible FAISS and BM25 score scales.
+6.  An optional local **`BAAI/bge-reranker-base` Cross-Encoder** can jointly score query–chunk pairs and rerank the fused candidate set.
+7.  The caller-visible result count is returned: **Chat top 5**, **CLI top 8 by default**, and **Evaluation top 8**.
 
-`raw_faiss_score` represents dense semantic similarity.
-`lexical_overlap` rewards direct term agreement. The combined score
-determines final ranking while the raw similarity remains available for
-developer inspection.
+The production configuration keeps Hybrid retrieval enabled and the Cross-Encoder disabled by default:
+
+``` python
+enable_hybrid = True
+enable_cross_encoder = False
+```
+
+The trace layer preserves the underlying retrieval signals for developer inspection, including raw FAISS similarity, BM25 score, RRF score, and Cross-Encoder score when that stage is enabled.
+
+## Retrieval benchmark
+
+Retrieval quality is evaluated separately from generated-answer quality. The benchmark compares three controlled retrieval modes over **25 ground-truth questions with 25/25 verified chunk-level relevance judgments**.
+
+``` mermaid
+flowchart TD
+    Q["25 Verified Questions"] --> B["Baseline<br/>FAISS + lexical reranking"]
+    Q --> H["Hybrid<br/>FAISS + BM25 → RRF"]
+    Q --> C["Hybrid + Cross-Encoder<br/>FAISS + BM25 → RRF → BGE"]
+    B --> M["Recall@k · Precision@k<br/>MRR · nDCG@k · Latency"]
+    H --> M
+    C --> M
+    M --> D["Production Decision<br/>Hybrid"]
+```
+
+| Metric | Baseline | Hybrid | Hybrid + Cross-Encoder |
+|---|---:|---:|---:|
+| Recall@3 | 0.390 | **0.427** | 0.367 |
+| Recall@5 | 0.480 | **0.527** | 0.483 |
+| Recall@8 | 0.520 | **0.611** | 0.605 |
+| Precision@3 | 0.293 | **0.307** | 0.267 |
+| Precision@5 | **0.216** | **0.216** | 0.208 |
+| Precision@8 | 0.145 | 0.165 | **0.170** |
+| MRR | 0.490 | 0.474 | **0.539** |
+| nDCG@3 | 0.367 | **0.372** | **0.372** |
+| nDCG@5 | 0.399 | 0.409 | **0.420** |
+| nDCG@8 | 0.416 | 0.446 | **0.474** |
+| Avg retrieval latency | 302.161 ms | **58.645 ms** | 19,694.866 ms |
+
+Hybrid retrieval was selected as the production default because it delivered the strongest retrieval coverage, increasing **Recall@8 from 0.520 to 0.611**, while keeping practical retrieval latency low. The Cross-Encoder improved ranking-oriented metrics such as **MRR** and **nDCG@8**, but introduced substantial additional inference latency in this benchmark.
+
+The Cross-Encoder therefore remains implemented and available for experimentation, while **FAISS + BM25 → RRF** is the production quality/latency trade-off.
+
+Full benchmark results are recorded in:
+
+``` text
+data/evaluation/retrieval/retrieval_benchmark_results.md
+```
+
+Run the retrieval-only benchmark with:
+
+``` powershell
+python -m multimodal_rag.evaluation.retrieval_benchmark
+```
 
 # Quickstart
 
@@ -271,8 +341,12 @@ answer.
 
 # Evaluation
 
-The repository supports both **one-question evaluation** for debugging
-and **batch evaluation** for benchmarking.
+The project separates **retrieval evaluation** from **generated-answer evaluation**:
+
+-   **Retrieval benchmark:** evaluates whether the retriever finds and ranks the correct evidence using Recall@k, Precision@k, MRR, nDCG@k, and latency.
+-   **RAGAS:** evaluates the generated answer and retrieved context using Faithfulness, Answer Relevancy, Context Precision, Context Recall, and Answer Correctness.
+
+The repository supports both **one-question RAGAS evaluation** for debugging and **batch RAGAS evaluation** for benchmarking.
 
 ## Evaluate one ground-truth question
 
@@ -340,7 +414,7 @@ Designed for RAG engineering and evaluation:
 -   run a developer test question
 -   inspect previous traced questions
 -   view ranked retrieved chunks
--   compare raw FAISS and combined rerank scores
+-   inspect FAISS, BM25, RRF, and optional Cross-Encoder scores
 -   inspect retrieval and generation latency
 -   inspect token telemetry when available
 -   inspect complete evidence and metadata
@@ -382,7 +456,12 @@ Evaluation runs only after an explicit action.
   Vector index            FAISS                              Dense similarity
                                                              retrieval
 
-  Ranking                 FAISS + lexical overlap            Candidate reranking
+  Sparse retrieval        BM25                               Lexical retrieval
+
+  Fusion                  Reciprocal Rank Fusion (RRF)        Dense + sparse rank fusion
+
+  Optional reranking      `BAAI/bge-reranker-base`            Cross-Encoder query–chunk
+                                                             reranking
 
   Generation              `gemini-3.1-flash-lite`            Grounded answer
                                                              generation
@@ -405,18 +484,18 @@ multimodal-rag/
 │   ├── ingestion/          # PDF analysis, extraction, validation, chunking
 │   ├── rag/                # embeddings, FAISS, retrieval, generation, traces
 │   ├── cli/                # ingest, index, and ask commands
-│   ├── evaluation/         # batch and question-wise RAGAS evaluation
+│   ├── evaluation/         # RAGAS evaluation + retrieval benchmark
 │   ├── ui/                 # Streamlit application
 │   └── tools/              # diagnostics and comparison utilities
 │
 ├── data/
 │   ├── input/              # source PDFs
 │   ├── artifacts/          # ingestion artifacts and FAISS index
-│   ├── evaluation/         # evaluation outputs
+│   ├── evaluation/         # RAGAS + retrieval benchmark outputs
 │   └── logs/               # runtime logs
 │
 ├── evaluation/
-│   └── datasets/           # ground-truth dataset
+│   └── datasets/           # ground truth + retrieval relevance labels
 │
 ├── docs/
 │   ├── ARCHITECTURE_REFERENCE.md
@@ -436,7 +515,7 @@ Run the complete automated suite with:
 python -m pytest
 ```
 
-The latest verified working-tree baseline passed **65 tests**. Provider
+The latest verified working-tree baseline passed **68 tests**. Provider
 interactions are mocked during automated tests, so normal test execution
 does not require live Gemini, Groq, Ollama, or RAGAS calls.
 
@@ -451,7 +530,10 @@ Most document processing stays local:
   RapidOCR                            Local
   Cleaning and chunking               Local
   MiniLM embeddings                   Local
-  FAISS search and reranking          Local
+  FAISS dense retrieval               Local
+  BM25 sparse retrieval                Local
+  RRF fusion                           Local
+  BGE Cross-Encoder reranking          Local, optional
   Gemini Vision                       External, only when required
   Gemini answer generation            External
   Ollama evaluation                   Local
@@ -476,7 +558,7 @@ For implementation-level details:
 
 The architecture is designed to support further experimentation with:
 
--   stronger hybrid retrieval and structural ranking
+-   adaptive retrieval and structural ranking
 -   table- and figure-aware retrieval
 -   visual embeddings
 -   GraphRAG for multi-hop or corpus-global questions
