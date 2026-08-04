@@ -1,0 +1,262 @@
+[
+  {
+    "id": 1,
+    "question": "What does 'Enterprise AI' mean according to the playbook?",
+    "relevant_chunk_ids": [
+      "c_c903f6abea0a",
+      "c_0e8aa72a1628"
+    ],
+    "label_status": "verified",
+    "notes": "The definition is stated in the Enterprise AI intro paragraph and reinforced by the readiness summary on the same spread."
+  },
+  {
+    "id": 2,
+    "question": "How does the playbook define synthetic data?",
+    "relevant_chunk_ids": [
+      "c_0edb5f6bf548",
+      "c_05ce5ec24408",
+      "c_9932c8e105d7",
+      "c_c503870913ff"
+    ],
+    "label_status": "verified",
+    "notes": "Question traditional practices explicitly defines synthetic data as artificially generated datasets used with clean rooms."
+  },
+  {
+    "id": 3,
+    "question": "Why does the playbook describe data as both 'the accelerator and the brake' for AI in marketing?",
+    "relevant_chunk_ids": [
+      "c_9e432c907ff4",
+      "c_3c2c6c15f31e",
+      "c_be32587654bd"
+    ],
+    "label_status": "verified",
+    "notes": "The accelerator/brake section and its follow-on data challenges explain fragmentation, ownership, and governability."
+  },
+  {
+    "id": 4,
+    "question": "What are the three main advantages of starting AI initiatives with a minimum viable product (MVP) approach?",
+    "relevant_chunk_ids": [
+      "c_311cad4986e5",
+      "c_796eac837f80",
+      "c_2cefe75bdbfb",
+      "c_4e7ca24c6e6d"
+    ],
+    "label_status": "verified",
+    "notes": "The MVP section covers quick wins, lower risk, and scalable learning before larger investment."
+  },
+  {
+    "id": 5,
+    "question": "According to the playbook, how does AI governance enable rather than restrict AI scaling?",
+    "relevant_chunk_ids": [
+      "c_f0b5780cdbbb",
+      "c_9c12e7142415"
+    ],
+    "label_status": "verified",
+    "notes": "The governance section explains that guardrails accelerate adoption, reduce risk, and create consistency."
+  },
+  {
+    "id": 6,
+    "question": "What does 'AI literacy' mean for marketers in this playbook, and why does it matter?",
+    "relevant_chunk_ids": [
+      "c_a9ad40abcf45",
+      "c_22be5d703412",
+      "c_c3af6df5c67b"
+    ],
+    "label_status": "verified",
+    "notes": "The AI literacy foundation defines the capability and explains why broad literacy is required for responsible adoption."
+  },
+  {
+    "id": 7,
+    "question": "How do the short-term and long-term implications of AI for marketing data differ?",
+    "relevant_chunk_ids": [
+      "c_f3f98ad9ec56",
+      "c_6294b8586915"
+    ],
+    "label_status": "verified",
+    "notes": "Both short-term and long-term data chunks are directly on page 6."
+  },
+  {
+    "id": 8,
+    "question": "What is the difference between the short-term and long-term technology implications of AI in marketing?",
+    "relevant_chunk_ids": [
+      "c_e38a8360c5a5",
+      "c_efa07b4e75be"
+    ],
+    "label_status": "verified",
+    "notes": "The technology section contrasts bundled tools with converged AI-first stacks and agentic systems."
+  },
+  {
+    "id": 9,
+    "question": "How do the short-term and long-term brand implications of AI compare?",
+    "relevant_chunk_ids": [
+      "c_03b788a8f090",
+      "c_520a358b8ef2"
+    ],
+    "label_status": "verified",
+    "notes": "Brand short-term and long-term sections capture the contrast between faster cycles and deeper trust/privacy positioning."
+  },
+  {
+    "id": 10,
+    "question": "What changes between the short-term and long-term implications of AI for marketing creativity?",
+    "relevant_chunk_ids": [
+      "c_8b0a985f0824",
+      "c_e433b6954bf5"
+    ],
+    "label_status": "verified",
+    "notes": "The creativity section contrasts faster ideation with human-AI co-creation and redefined roles."
+  },
+  {
+    "id": 11,
+    "question": "How do the long-term implications for Brand differ from the long-term implications for Media?",
+    "relevant_chunk_ids": [
+      "c_520a358b8ef2",
+      "c_cbd31af72b1e"
+    ],
+    "label_status": "verified",
+    "notes": "Brand centers on trust and privacy-safe data; media focuses on autonomous planning and orchestration."
+  },
+  {
+    "id": 12,
+    "question": "According to the data foundation evaluation checklist, what distinguishes a strong data foundation from a weak one in terms of data governance?",
+    "relevant_chunk_ids": [
+      "c_0d528b1f04c3",
+      "c_eb070176d5d6"
+    ],
+    "label_status": "verified",
+    "notes": "The checklist explicitly contrasts integrated governance with ad hoc or absent governance."
+  },
+  {
+    "id": 13,
+    "question": "Per the data foundation checklist, how does data storage differ between strong and weak data foundations?",
+    "relevant_chunk_ids": [
+      "c_0d528b1f04c3",
+      "c_eb070176d5d6"
+    ],
+    "label_status": "verified",
+    "notes": "The same checklist row covers centralized versus fragmented/siloed data storage."
+  },
+  {
+    "id": 14,
+    "question": "What are the five elements of robust AI governance listed in Figure 3?",
+    "relevant_chunk_ids": [
+      "c_26df036069c8",
+      "c_3b66369560f2"
+    ],
+    "label_status": "verified",
+    "notes": "Figure 3 lists the five governance practices in the table header and supporting text."
+  },
+  {
+    "id": 15,
+    "question": "What three types of AI training does the playbook describe in Figure 4, and what does each involve?",
+    "relevant_chunk_ids": [
+      "c_236f8c9b9ee8",
+      "c_d2d8c78c9337"
+    ],
+    "label_status": "verified",
+    "notes": "The figure table names the three training types and their approaches."
+  },
+  {
+    "id": 16,
+    "question": "Which AI marketing use case does the playbook rate as having 'high viability and transformational potential as organizations mature'?",
+    "relevant_chunk_ids": [
+      "c_fff3363e1f63",
+      "c_e7c31629db8c"
+    ],
+    "label_status": "verified",
+    "notes": "Figure 8 contains the repeatability/viability matrix and the use-case table."
+  },
+  {
+    "id": 17,
+    "question": "How does the playbook recommend tracking and incentivizing AI literacy progress, per Figure 7?",
+    "relevant_chunk_ids": [
+      "c_95029b2cbf13",
+      "c_923df244fd16"
+    ],
+    "label_status": "verified",
+    "notes": "Figure 7 and its approach text cover assessments, dashboards, and linking upskilling to performance."
+  },
+  {
+    "id": 18,
+    "question": "What are the five dimensions of AI readiness shown in Figure 1?",
+    "relevant_chunk_ids": [
+      "c_3ce75120222c",
+      "c_ed132fe44d53"
+    ],
+    "label_status": "verified",
+    "notes": "The figure text explicitly lists Strategy, Governance, Talent, Data, and Technology."
+  },
+  {
+    "id": 19,
+    "question": "What percentage of companies are confident they are ready across all five dimensions of AI readiness, according to Infosys research cited in the playbook?",
+    "relevant_chunk_ids": [
+      "c_0e8aa72a1628",
+      "c_168fc8b8be26"
+    ],
+    "label_status": "verified",
+    "notes": "The readiness paragraph states that only 2% of companies are ready across all five dimensions."
+  },
+  {
+    "id": 20,
+    "question": "Given that only 2% of companies feel ready across all five AI-readiness dimensions, why does the playbook say marketing is uniquely positioned?",
+    "relevant_chunk_ids": [
+      "c_0e8aa72a1628",
+      "c_c903f6abea0a"
+    ],
+    "label_status": "verified",
+    "notes": "The same enterprise AI section explains that marketers already use AI broadly and deeply, which creates a favorable starting point."
+  },
+  {
+    "id": 21,
+    "question": "How does the playbook connect the data fragmentation problem to the practical steps CMOs are taking to address it?",
+    "relevant_chunk_ids": [
+      "c_9e432c907ff4",
+      "c_be32587654bd",
+      "c_4048054a8165",
+      "c_28fe6a9673fe"
+    ],
+    "label_status": "verified",
+    "notes": "The section spans the fragmentation diagnosis, collaboration steps, and practical data-cleaning/structuring actions."
+  },
+  {
+    "id": 22,
+    "question": "How does the playbook describe the overall progression from AI pilots to achieving repeatable, high-impact AI use in marketing?",
+    "relevant_chunk_ids": [
+      "c_311cad4986e5",
+      "c_ce89e8c49cc6",
+      "c_fff3363e1f63",
+      "c_68b36bcaba5b",
+      "c_6782eef481fa"
+    ],
+    "label_status": "verified",
+    "notes": "The MVP, scale, and repeatability sections together describe the progression from pilots to embedded use cases."
+  },
+  {
+    "id": 23,
+    "question": "What are the key takeaways from the 'Data is the accelerator...and the brake' section?",
+    "relevant_chunk_ids": [
+      "c_21f2adafa9ec"
+    ],
+    "label_status": "verified",
+    "notes": "The takeaways section on page 23 summarizes the data foundation, integration, governance, and ethics points."
+  },
+  {
+    "id": 24,
+    "question": "Summarize the main takeaways from the 'Responsible AI for growth' section.",
+    "relevant_chunk_ids": [
+      "c_9c12e7142415",
+      "c_f0b5780cdbbb",
+      "c_46ce8e355760"
+    ],
+    "label_status": "verified",
+    "notes": "The takeaways emphasize responsible practices, centralized oversight, human judgment, and trust."
+  },
+  {
+    "id": 25,
+    "question": "According to the Executive Summary, what is the primary purpose of this AI playbook?",
+    "relevant_chunk_ids": [
+      "c_f50a126652ef"
+    ],
+    "label_status": "verified",
+    "notes": "Direct Executive Summary match: purpose is to move from pilots to embedded enterprise AI that delivers measurable business impact and builds trust."
+  }
+]

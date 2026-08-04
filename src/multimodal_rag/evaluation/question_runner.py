@@ -283,10 +283,19 @@ def print_trace(trace: QuestionEvaluationTrace, stream: TextIO = sys.stdout) -> 
     for item in trace.rag.retrieved_items:
         line()
         line(f"[{item.rank}]")
-        line(f"Raw FAISS similarity score: {format(item.raw_faiss_score, '.17g')}")
+        line(
+            "Raw FAISS similarity score: "
+            f"{_display_value(item.raw_faiss_score, precision=17)}"
+        )
         line(
             "Combined rerank score: "
             f"{_display_value(item.combined_rerank_score, precision=17)}"
+        )
+        line(f"BM25 score: {_display_value(item.bm25_score, precision=17)}")
+        line(f"RRF score: {_display_value(item.rrf_score, precision=17)}")
+        line(
+            "Cross-encoder score: "
+            f"{_display_value(item.cross_encoder_score, precision=17)}"
         )
         line(f"Chunk ID: {item.chunk_id}")
         line(f"Document: {item.document_name}")

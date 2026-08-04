@@ -12,7 +12,9 @@ job is just correct composition + result shaping.
 from __future__ import annotations
 
 import logging
+import math
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 from multimodal_rag.rag.embedding.embedder import EmbeddingConfig, _embed_texts
@@ -27,12 +29,25 @@ _STOPWORDS = {
     "will", "would", "should", "this", "that", "these", "those",
 }
 # Standard English stopwords - excluded so overlap scoring reflects real
-# topic/polarity words (e.g. "long-term", "technology") rather than
-# near-universal function words that would overlap with almost any chunk.
+# topic/polarity words rather than near-universal function words that would
+# overlap with almost any chunk.
+
+_DEFAULT_CANDIDATE_POOL = 20
+_DEFAULT_RRF_K = 60
+_DEFAULT_CROSS_ENCODER_MODEL = "BAAI/bge-reranker-base"
+
+
+def _normalize_lexical_text(text: str) -> str:
+    """Normalize Unicode and punctuation boundaries before lexical scoring."""
+    normalized = unicodedata.normalize("NFKC", text or "").lower()
+    return re.sub(r"[^a-z0-9]+", " ", normalized)
 
 
 def _tokenize(text: str) -> set[str]:
-    return {t for t in re.findall(r"[a-z0-9\-]+", text.lower()) if t not in _STOPWORDS}
+    return {
+        token for token in _normalize_lexical_text(text).split()
+        if token not in _STOPWORDS
+    }
 
 
 def _lexical_overlap(query_tokens: set[str], chunk_text: str) -> float:
@@ -56,8 +71,11 @@ class RetrievedChunk:
     page_numbers: list[int]
     section_title: str | None
     chunk_text: str
-    score: float
+    score: float | None
     combined_rerank_score: float | None = field(default=None, compare=False)
+    bm25_score: float | None = field(default=None, compare=False)
+    rrf_score: float | None = field(default=None, compare=False)
+    cross_encoder_score: float | None = field(default=None, compare=False)
 
 
 @dataclass
@@ -78,6 +96,82 @@ class RetrieverConfig:
     # "Technology" chunk (cosine 0.3361, overlap 3/3 query terms).
     # Minimum flip weight = (0.3799-0.3361)/(1.0-0.667) ≈ 0.1315; 0.15
     # adds a small margin. Set to 0.0 to disable reranking entirely.
+    enable_hybrid: bool = True
+    dense_candidate_k: int = _DEFAULT_CANDIDATE_POOL
+    sparse_candidate_k: int = _DEFAULT_CANDIDATE_POOL
+    rrf_k: int = _DEFAULT_RRF_K
+    enable_cross_encoder: bool = False
+    cross_encoder_model: str = _DEFAULT_CROSS_ENCODER_MODEL
+    bm25_k1: float = 1.5
+    bm25_b: float = 0.75
+
+
+_cross_encoder = None
+_cross_encoder_name: str | None = None
+
+
+def _bm25_rank(
+    query: str,
+    id_map: dict[int, IndexedChunkRef],
+    top_k: int,
+    *,
+    k1: float,
+    b: float,
+) -> list[tuple[IndexedChunkRef, float]]:
+    """Rank the indexed chunk corpus with a dependency-free BM25 scorer."""
+    query_tokens = _tokenize(query)
+    if not query_tokens or top_k <= 0:
+        return []
+
+    refs = list(id_map.values())
+    tokenized = [(ref, _tokenize(ref.chunk_text)) for ref in refs]
+    document_frequency = {
+        token: sum(token in tokens for _ref, tokens in tokenized)
+        for token in query_tokens
+    }
+    average_length = sum(len(tokens) for _ref, tokens in tokenized) / max(len(tokenized), 1)
+    document_count = len(tokenized)
+    scored: list[tuple[IndexedChunkRef, float]] = []
+    for ref, tokens in tokenized:
+        document_length = len(tokens)
+        score = 0.0
+        for token in query_tokens:
+            frequency = sum(1 for value in tokens if value == token)
+            if not frequency:
+                continue
+            df = document_frequency[token]
+            idf = math.log(1.0 + (document_count - df + 0.5) / (df + 0.5))
+            denominator = frequency + k1 * (
+                1.0 - b + b * document_length / max(average_length, 1.0)
+            )
+            score += idf * (frequency * (k1 + 1.0)) / denominator
+        if score > 0.0:
+            scored.append((ref, score))
+    scored.sort(key=lambda item: item[1], reverse=True)
+    return scored[:top_k]
+
+
+def _get_cross_encoder(model_name: str):
+    global _cross_encoder, _cross_encoder_name
+    if _cross_encoder is not None and _cross_encoder_name == model_name:
+        return _cross_encoder
+    try:
+        from sentence_transformers import CrossEncoder
+        _cross_encoder = CrossEncoder(model_name, local_files_only=True)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Cross-encoder '{model_name}' is not available locally. "
+            "Provision its cached model before enabling cross-encoder reranking."
+        ) from exc
+    _cross_encoder_name = model_name
+    return _cross_encoder
+
+
+def _cross_encoder_rank(query: str, candidates: list[IndexedChunkRef], model_name: str):
+    model = _get_cross_encoder(model_name)
+    pairs = [(query, candidate.chunk_text) for candidate in candidates]
+    scores = model.predict(pairs)
+    return [float(score) for score in scores]
 
 
 def retrieve(
@@ -101,7 +195,78 @@ def retrieve(
         raise ValueError("Query must not be empty.")
 
     query_vector = embed_fn([query.strip()], embedding_config)[0]
-    raw_results = search(index, id_map, query_vector, top_k=retriever_config.top_k)
+    candidate_k = max(
+        retriever_config.top_k,
+        retriever_config.dense_candidate_k if retriever_config.enable_hybrid else _DEFAULT_CANDIDATE_POOL,
+    )
+    raw_results = search(index, id_map, query_vector, top_k=candidate_k)
+
+    if retriever_config.enable_hybrid:
+        sparse_results = _bm25_rank(
+            query,
+            id_map,
+            retriever_config.sparse_candidate_k,
+            k1=retriever_config.bm25_k1,
+            b=retriever_config.bm25_b,
+        )
+        dense_by_id = {ref.chunk_id: (ref, score, rank) for rank, (ref, score) in enumerate(raw_results, 1)}
+        sparse_by_id = {ref.chunk_id: (ref, score, rank) for rank, (ref, score) in enumerate(sparse_results, 1)}
+        candidate_ids = set(dense_by_id) | set(sparse_by_id)
+        fused = []
+        for chunk_id in candidate_ids:
+            dense = dense_by_id.get(chunk_id)
+            sparse = sparse_by_id.get(chunk_id)
+            ref = dense[0] if dense is not None else sparse[0]
+            raw_score = dense[1] if dense is not None else None
+            bm25_score = sparse[1] if sparse is not None else None
+            rrf_score = (
+                (1.0 / (retriever_config.rrf_k + dense[2])) if dense is not None else 0.0
+            ) + (
+                (1.0 / (retriever_config.rrf_k + sparse[2])) if sparse is not None else 0.0
+            )
+            fused.append((ref, raw_score, bm25_score, rrf_score))
+        fused.sort(key=lambda item: (item[3], item[0].chunk_id), reverse=True)
+        if retriever_config.enable_cross_encoder:
+            cross_scores = _cross_encoder_rank(
+                query,
+                [item[0] for item in fused],
+                retriever_config.cross_encoder_model,
+            )
+            fused = [
+                item + (cross_score,)
+                for item, cross_score in zip(fused, cross_scores)
+            ]
+            fused.sort(key=lambda item: (item[4], item[0].chunk_id), reverse=True)
+        else:
+            fused = [item + (None,) for item in fused]
+
+        query_tokens = _tokenize(query) if retriever_config.lexical_rerank_weight else set()
+        eligible_results = [
+            RetrievedChunk(
+                chunk_id=ref.chunk_id,
+                document_id=ref.document_id,
+                source_file=ref.source_file,
+                page_numbers=ref.page_numbers,
+                section_title=ref.section_title,
+                chunk_text=ref.chunk_text,
+                score=raw_score,
+                combined_rerank_score=(
+                    raw_score
+                    + retriever_config.lexical_rerank_weight
+                    * _lexical_overlap(query_tokens, ref.chunk_text)
+                    if raw_score is not None
+                    else None
+                ),
+                bm25_score=bm25_score,
+                rrf_score=rrf_score,
+                cross_encoder_score=cross_score,
+            )
+            for ref, raw_score, bm25_score, rrf_score, cross_score in fused
+            if raw_score is None or raw_score >= retriever_config.min_score
+        ]
+        results = eligible_results[:retriever_config.top_k]
+        logger.info("Retrieved %d hybrid chunk(s) for query (top_k=%d)", len(results), retriever_config.top_k)
+        return results
 
     query_tokens = _tokenize(query) if retriever_config.lexical_rerank_weight else set()
     scored_results = [
@@ -117,7 +282,7 @@ def retrieve(
     if retriever_config.lexical_rerank_weight:
         scored_results = sorted(scored_results, key=lambda result: result[2], reverse=True)
 
-    results = [
+    eligible_results = [
         RetrievedChunk(
             chunk_id=ref.chunk_id, document_id=ref.document_id, source_file=ref.source_file,
             page_numbers=ref.page_numbers, section_title=ref.section_title,
@@ -127,5 +292,6 @@ def retrieve(
         for ref, score, combined_score in scored_results
         if score >= retriever_config.min_score
     ]
+    results = eligible_results[:retriever_config.top_k]
     logger.info("Retrieved %d chunk(s) for query (top_k=%d)", len(results), retriever_config.top_k)
     return results

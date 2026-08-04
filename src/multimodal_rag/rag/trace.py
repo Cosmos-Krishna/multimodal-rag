@@ -30,7 +30,7 @@ from multimodal_rag.rag.retrieval.retriever_2 import RetrieverConfig, retrieve
 @dataclass
 class RetrievedItemTrace:
     rank: int
-    raw_faiss_score: float
+    raw_faiss_score: float | None
     chunk_id: str
     document_id: str
     document_name: str
@@ -40,6 +40,9 @@ class RetrievedItemTrace:
     metadata: dict[str, Any] | None = None
     metadata_note: str | None = None
     combined_rerank_score: float | None = None
+    bm25_score: float | None = None
+    rrf_score: float | None = None
+    cross_encoder_score: float | None = None
 
 
 @dataclass
@@ -177,6 +180,9 @@ def run_rag_trace(
                 metadata=metadata,
                 metadata_note=metadata_note,
                 combined_rerank_score=getattr(chunk, "combined_rerank_score", None),
+                bm25_score=getattr(chunk, "bm25_score", None),
+                rrf_score=getattr(chunk, "rrf_score", None),
+                cross_encoder_score=getattr(chunk, "cross_encoder_score", None),
             )
         )
 
